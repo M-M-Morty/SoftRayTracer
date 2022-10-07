@@ -55,11 +55,26 @@ public:
 		return e[0] * e[0] + e[1] * e[1] + e[2] * e[2];
 	}
 
-	void write_color(std::ostream& out)
+	void write_color(std::ostream& out,int samples_per_pixel)
 	{
-		out << static_cast<int>(255.999 * e[0]) << ' '
-			<< static_cast<int>(255.999 * e[1]) << ' '
-			<< static_cast<int>(255.999 * e[2]) << '\n';
+		auto scale = 1.0 / samples_per_pixel;
+		auto r = sqrt(scale * e[0]);
+		auto g = sqrt(scale * e[1]);
+		auto b = sqrt(scale * e[2]);
+
+		out << static_cast<int>(256*clamp(r,0.0,0.999)) << ' '
+			<< static_cast<int>(256*clamp(g,0.0,0.999)) << ' '
+			<< static_cast<int>(256*clamp(b,0.0,0.999)) << '\n';
+	}
+
+	static vec3 random()
+	{
+		return vec3(random_double(), random_double(), random_double());
+	}
+
+	static vec3 random(double min, double max)
+	{
+		return vec3(random_double(min, max), random_double(min, max), random_double(min, max));
 	}
 
 public:
@@ -127,4 +142,64 @@ cross(const vec3& u, const vec3& v)
 inline vec3 unit_vector(vec3 v)
 {
 	return v / v.length();
+}
+
+/*
+* 以下是用来计算漫反射的方向（随机），起点为单位圆的圆心
+*/
+
+
+//终点在单位球面内的随机向量（长度也随机）
+vec3 random_in_unit_sphere()
+{
+	while (true)
+	{
+		auto p = vec3::random(-1, 1);
+		if(p.length_squared()>=1) continue;
+		return p;
+	}
+}
+//终点在单位球面上的随机向量（极坐标表示，长度为1）
+vec3 random_unit_vector()
+{
+	auto a = random_double(0, 2 * PI);
+	auto z = random_double(-1, 1);
+	auto r = sqrt(1 - z * z);
+	return vec3(r * cos(a), r * sin(a), z);
+}
+//半球面随机向量
+vec3 random_in_hemisphere(const vec3& normal)
+{
+	vec3 in_unit_sphere = random_in_unit_sphere();
+	if (dot(in_unit_sphere, normal) > 0.0)
+		return in_unit_sphere;
+	else
+		return -in_unit_sphere;
+}
+
+
+//金属材质的反射
+vec3 reflect(const vec3& v, const vec3& n)
+{
+	return v - 2 * dot(v, n) * n;
+}
+
+//根据入射方向，法线，折射率（比值）计算折射方向
+vec3 refract(const vec3& uv, const vec3& n, double etai_over_etat)
+{
+	auto cos_theta = dot(-uv, n);
+	vec3 r_out_parallel = etai_over_etat * (uv + cos_theta * n);
+	vec3 r_out_perp = -sqrt(1.0 - r_out_parallel.length_squared()) * n;
+	return r_out_parallel + r_out_perp;
+}
+
+vec3 random_in_unit_disk()
+{
+	while (true)
+	{
+		auto p = vec3(random_double(-1, 1), random_double(-1, 1), 0);
+		if (p.length_squared() >= 1) continue;
+		return p;
+	}
+	
 }
